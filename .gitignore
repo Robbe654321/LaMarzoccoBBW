@@ -1,27 +1,4 @@
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyc
-*.pyd
-.Python
-*.egg-info/
-.pytest_cache/
-
-# Virtual environments
-.venv/
-venv/
-env/
-
-# IDE/editor
-.vscode/
-.idea/
-
-# OS
+.build/
 .DS_Store
-Thumbs.db
-
-# Build/dist
-build/
-dist/
-
+xcuserdata/
+DerivedData/
