@@ -8,7 +8,7 @@ const char* WIFI_PASS = "1eve111a";
 // Pinnen (zoals jij gebruikt)
 const int PIN_RL_MAIN   = 4;  // Relay #1
 const int PIN_RL_BYPASS = 7;  // Relay #2  (Relay #3 volgt HW)
-const int PIN_PADDLE_IN = 3;  // Paddle naar 5V, GND via interne PULLDOWN
+const int PIN_PADDLE_IN = 3;  // Paddle naar GND, interne PULLUP naar 5V
 
 enum Mode { MODE_AUTO, MODE_MANUAL };
 Mode mode = MODE_MANUAL;
@@ -57,12 +57,14 @@ void handleLogic(){
   // --- Power-on ignore window ---
   if (now - bootMs < IGNORE_AFTER_BOOT_MS) {
     // houd uitgang fail-safe; lees wel alvast raw zodat we na 200ms schoon starten
-    lastRaw = digitalRead(PIN_PADDLE_IN);
+    // Lees geïnverteerd: INPUT_PULLUP => open=HIGH(0), dicht=LOW(1)
+    lastRaw = (digitalRead(PIN_PADDLE_IN) == LOW ? 1 : 0);
     return;
   }
 
   // --- Strong filtering: debounce + min stable window ---
-  int raw = digitalRead(PIN_PADDLE_IN);  // 0=open, 1=gesloten (INPUT_PULLDOWN)
+  // INPUT_PULLUP: open=HIGH, dicht=LOW ⇒ invert naar open=0, dicht=1
+  int raw = (digitalRead(PIN_PADDLE_IN) == LOW ? 1 : 0);  // 0=open, 1=gesloten
   if (raw != lastRaw) {
     lastRaw = raw;
     lastEdgeCandidateTs = now;           // start “kandidaat” overgang
@@ -233,7 +235,7 @@ void setup(){
   Serial.begin(115200);
   pinMode(PIN_RL_MAIN,   OUTPUT);
   pinMode(PIN_RL_BYPASS, OUTPUT);
-  pinMode(PIN_PADDLE_IN, INPUT_PULLUP);  // <<— bevestigd: alleen pulldown
+  pinMode(PIN_PADDLE_IN, INPUT_PULLUP);  // interne pull-up, open=HIGH
 
   mode = MODE_MANUAL;
   setRelayMain(false);
