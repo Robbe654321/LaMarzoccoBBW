@@ -1,3 +1,0 @@
-# Minimal deps for dashboard without cloud integration
-tomli; python_version < '3.11'
-
