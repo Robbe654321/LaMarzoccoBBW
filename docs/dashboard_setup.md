@@ -39,7 +39,7 @@ Clone this repository and create a virtual environment:
 ```bash
 cd /opt
 sudo git clone https://github.com/Robbe654321/LaMarzoccoBBW.git
-sudo chown -R pi:pi LaMarzoccoBBW
+sudo chown -R robbewillemsens:robbewillemsens LaMarzoccoBBW
 cd LaMarzoccoBBW
 python3 -m venv .venv
 source .venv/bin/activate
@@ -126,7 +126,7 @@ console window.
 
 ## 5. Auto-start on boot (optional)
 
-Create a systemd service to launch the dashboard for user `pi`:
+Create a systemd service to launch the dashboard for user `robbewillemsens`:
 
 ```bash
 sudo tee /etc/systemd/system/lama-dashboard.service > /dev/null <<'EOF'
@@ -136,10 +136,10 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=pi
+User=robbewillemsens
 WorkingDirectory=/opt/LaMarzoccoBBW
 Environment=DISPLAY=:0
-Environment=XAUTHORITY=/home/pi/.Xauthority
+Environment=XAUTHORITY=/home/robbewillemsens/.Xauthority
 ExecStart=/opt/LaMarzoccoBBW/.venv/bin/python /opt/LaMarzoccoBBW/dashboard.py
 Restart=on-failure
 
