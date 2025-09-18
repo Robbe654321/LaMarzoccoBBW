@@ -1,0 +1,27 @@
+# Copy this file to dashboard.toml and update with your own credentials.
+
+refresh_rate_ms = 200
+
+[arduino]
+host = "192.168.0.177"
+timeout = 0.6
+
+[shot]
+target_weight_g = 36.0
+
+[la_marzocco]
+# Set enable_cloud to true once you have valid credentials and installation key
+enable_cloud = false
+serial_number = "LM000000"
+username = "name@example.com"
+password = "super-secret"
+# Values returned by pylamarzocco.util.generate_installation_key
+installation_id = ""
+installation_secret_b64 = ""
+installation_private_key_b64 = ""
+
+[ui]
+fullscreen = true
+bg_color = "#111111"
+fg_color = "#F7F7F7"
+accent_color = "#FF8C42"
