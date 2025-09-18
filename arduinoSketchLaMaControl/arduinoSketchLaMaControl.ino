@@ -1,4 +1,4 @@
-// UNO R4 WiFi — LM paddle controller via HTTP (INPUT_PULLDOWN only, extra filtering)
+// UNO R4 WiFi — LM paddle controller via HTTP (INPUT_PULLUP, gesture flush, extra filtering)
 
 #include <WiFiS3.h>
 
@@ -29,6 +29,13 @@ unsigned long bootMs = 0;
 // Auto-flush
 bool flushActive = false;
 unsigned long flushUntil = 0;
+
+// Gesture-based flush (short paddle tap)
+bool gestureFlushEnabled = true;      // kan via /config uitgezet worden
+unsigned long GESTURE_FLUSH_MS   = 2000; // duur van flush in ms
+unsigned long GESTURE_PULSE_MIN_MS = 60; // minimaal (boven debounce) om tap te tellen
+unsigned long GESTURE_PULSE_MAX_MS = 350; // maximaal om als "kort" te gelden
+unsigned long lastCloseTs = 0;          // tijdstempel van laatste 0->1 (paddle dicht)
 
 WiFiServer server(80);
 
@@ -76,8 +83,22 @@ void handleLogic(){
         int prev = stableState;
         stableState = raw;
 
-        // Rising edge 0->1: paddle moet override/flush altijd kunnen stoppen
-        if (prev == 0 && stableState == 1) cancelOverrideAndFlush();
+        // Rising edge 0->1: paddle dicht — noteer start voor mogelijke korte tap
+        if (prev == 0 && stableState == 1) {
+          cancelOverrideAndFlush();
+          lastCloseTs = now;
+        }
+        // Falling edge 1->0: paddle open — detecteer korte tap en start flush
+        if (prev == 1 && stableState == 0) {
+          if (lastCloseTs > 0) {
+            unsigned long pulseMs = now - lastCloseTs;
+            if (gestureFlushEnabled && !overrideActive && mode == MODE_AUTO &&
+                pulseMs >= GESTURE_PULSE_MIN_MS && pulseMs <= GESTURE_PULSE_MAX_MS) {
+              flushActive = true;
+              flushUntil = now + GESTURE_FLUSH_MS;
+            }
+          }
+        }
 
         lastStable = prev;
       }
@@ -89,14 +110,14 @@ void handleLogic(){
     setRelayBypass(true);
     bool mainCmd = false;
 
-    if (flushActive){
-      if (now >= flushUntil) flushActive = false;
-      else                   mainCmd = true;
+    // Override krijgt prioriteit
+    if (overrideActive) {
+      mainCmd = (overrideValue != 0);
+    } else if (flushActive) {
+      if (now >= flushUntil) flushActive = false; else mainCmd = true;
     }
-
-    if (!flushActive){
-      if (overrideActive) mainCmd = (overrideValue != 0);
-      else                mainCmd = (stableState  != 0);
+    if (!overrideActive && !flushActive) {
+      mainCmd = (stableState != 0);
     }
 
     setRelayMain(mainCmd);
@@ -126,6 +147,10 @@ void sendJsonStatus(WiFiClient &client){
   client.print(",\"relay_main\":"); client.print((int)getRelayMain());
   client.print(",\"override\":\""); client.print(overrideActive ? (overrideValue? "1":"0") : "off");
   client.print("\",\"flush_active\":"); client.print(flushActive ? "true":"false");
+  client.print(",\"gesture_enabled\":"); client.print(gestureFlushEnabled ? "true":"false");
+  client.print(",\"gesture_flush_ms\":"); client.print(GESTURE_FLUSH_MS);
+  client.print(",\"gesture_pulse_min_ms\":"); client.print(GESTURE_PULSE_MIN_MS);
+  client.print(",\"gesture_pulse_max_ms\":"); client.print(GESTURE_PULSE_MAX_MS);
   client.print(",\"debounce_ms\":"); client.print(DEBOUNCE_MS);
   client.print(",\"stable_req_ms\":"); client.print(STABLE_REQ_MS);
   client.print(",\"boot_ignore_ms\":"); client.print(IGNORE_AFTER_BOOT_MS);
@@ -222,8 +247,19 @@ void handleHttp(){
   else if (route=="/config"){
     String db = getQueryValue(query,"debounce_ms");
     String st = getQueryValue(query,"stable_ms");
+    String gf = getQueryValue(query,"gesture"); // on/off/1/0
+    String fm = getQueryValue(query,"flush_ms");
+    String gmin = getQueryValue(query,"pulse_min_ms");
+    String gmax = getQueryValue(query,"pulse_max_ms");
     if (db.length()){ unsigned long v = (unsigned long) db.toInt(); if (v>=5 && v<=500) DEBOUNCE_MS = v; }
     if (st.length()){ unsigned long v = (unsigned long) st.toInt(); if (v>=0 && v<=500) STABLE_REQ_MS = v; }
+    if (gf.length()){
+      String v = gf; v.toLowerCase();
+      gestureFlushEnabled = (v=="1" || v=="on" || v=="true");
+    }
+    if (fm.length()){ unsigned long v = (unsigned long) fm.toInt(); if (v>=200 && v<=10000) GESTURE_FLUSH_MS = v; }
+    if (gmin.length()){ unsigned long v = (unsigned long) gmin.toInt(); if (v>=0 && v<=1000) GESTURE_PULSE_MIN_MS = v; }
+    if (gmax.length()){ unsigned long v = (unsigned long) gmax.toInt(); if (v>=0 && v<=2000) GESTURE_PULSE_MAX_MS = v; }
     sendJsonStatus(client);
   }
   else { sendHttpHeader(client,"text/plain",404); client.println("Not found"); }
